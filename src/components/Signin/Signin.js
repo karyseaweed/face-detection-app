@@ -1,4 +1,5 @@
 import React from 'react';
+import './Signin.css';
 
 class Signin extends React.Component {
   constructor(props) {
@@ -17,8 +18,11 @@ class Signin extends React.Component {
     this.setState({ signInPw: event.target.value });
   };
 
+  saveAuthTokenInSession = (token) => {
+    window.sessionStorage.setItem('token', token);
+  };
+
   onSubmitSignIn = () => {
-    console.log(this.state);
     // fetch does a GET request by default, but we want a POST in this case
     fetch('http://localhost:3000/signin', {
       method: 'post',
@@ -29,11 +33,24 @@ class Signin extends React.Component {
       }),
     })
       .then((response) => response.json())
-      .then((user) => {
+      .then((data) => {
         // if user exists
-        if (user.id) {
-          this.props.loadUser(user);
-          this.props.onRouteChange('home');
+        if (data.userId && data.success === 'true') {
+          this.saveAuthTokenInSession(data.token);
+          fetch(`http://localhost:3000/profile/${data.userId}`, {
+            method: 'get',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: data.token,
+            },
+          })
+            .then((resp) => resp.json())
+            .then((user) => {
+              if (user && user.email) {
+                this.props.loadUser(user);
+                this.props.onRouteChange('home');
+              }
+            });
         }
       });
   };
@@ -51,7 +68,7 @@ class Signin extends React.Component {
                   Email
                 </label>
                 <input
-                  className='pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100'
+                  className='pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100 hover-black'
                   type='email'
                   name='email-address'
                   id='email-address'
@@ -63,7 +80,7 @@ class Signin extends React.Component {
                   Password
                 </label>
                 <input
-                  className='b pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100'
+                  className='b pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100 hover-black'
                   type='password'
                   name='password'
                   id='password'

@@ -8,6 +8,8 @@ import ImageLinkForm from './components/ImageLinkForm/ImageLinkForm';
 import FaceRecognition from './components/FaceRecognition/FaceRecognition';
 import Signin from './components/Signin/Signin';
 import Register from './components/Register/Register';
+import Modal from './components/Modal/Modal';
+import Profile from './components/Profile/Profile';
 
 const particlesOptions = {
   fpsLimit: 60,
@@ -88,12 +90,15 @@ const initialState = {
   boxes: [],
   route: 'signin', // tells the app to start with the signin page
   isSignedIn: false,
+  isProfileOpen: false,
   user: {
     id: '',
     name: '',
     email: '',
     entries: 0,
     joined: '',
+    pet: '',
+    age: '',
   },
 };
 
@@ -103,12 +108,38 @@ class App extends Component {
     this.state = initialState;
   }
 
-  // just to test the connection to our server
-  // componentDidMount() {
-  //   fetch('http://localhost:3000/users')
-  //     .then((response) => response.json())
-  //     .then(console.log); // this is the same as .then(data => console.log(data))
-  // }
+  componentDidMount() {
+    const token = window.sessionStorage.getItem('token');
+    if (this.state.route === 'home' && token) {
+      fetch('http://localhost:3000/signin', {
+        method: 'post',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
+      })
+        .then((resp) => resp.json())
+        .then((data) => {
+          if (data && data.id) {
+            fetch(`http://localhost:3000/profile/${data.id}`, {
+              method: 'get',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: token,
+              },
+            })
+              .then((resp) => resp.json())
+              .then((user) => {
+                if (user && user.email) {
+                  this.loadUser(user);
+                  this.onRouteChange('home');
+                }
+              });
+          }
+        })
+        .catch(console.log);
+    }
+  }
 
   loadUser = (data) => {
     this.setState({
@@ -123,23 +154,28 @@ class App extends Component {
   };
 
   calculateFaceLocations = (data) => {
-    const clarifaiFaces = data.outputs[0].data.regions;
-    return clarifaiFaces.map((face) => {
-      const faceBox = face.region_info.bounding_box;
-      const image = document.getElementById('inputImage');
-      const width = Number(image.width);
-      const height = Number(image.height);
-      return {
-        leftCol: faceBox.left_col * width,
-        topRow: faceBox.top_row * height,
-        rightCol: width - faceBox.right_col * width,
-        bottomRow: height - faceBox.bottom_row * height,
-      };
-    });
+    if (data && data.outputs) {
+      const clarifaiFaces = data.outputs[0].data.regions;
+      return clarifaiFaces.map((face) => {
+        const faceBox = face.region_info.bounding_box;
+        const image = document.getElementById('inputImage');
+        const width = Number(image.width);
+        const height = Number(image.height);
+        return {
+          leftCol: faceBox.left_col * width,
+          topRow: faceBox.top_row * height,
+          rightCol: width - faceBox.right_col * width,
+          bottomRow: height - faceBox.bottom_row * height,
+        };
+      });
+    }
+    return;
   };
 
   displayFaceBoxes = (boxes) => {
-    this.setState({ boxes });
+    if (boxes) {
+      this.setState({ boxes });
+    }
   };
 
   onInputChange = (event) => {
@@ -150,7 +186,10 @@ class App extends Component {
     this.setState({ imageUrl: this.state.input });
     fetch('http://localhost:3000/imageurl', {
       method: 'post',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: window.sessionStorage.getItem('token'),
+      },
       body: JSON.stringify({
         input: this.state.input,
       }),
@@ -160,7 +199,10 @@ class App extends Component {
         if (response) {
           fetch('http://localhost:3000/image', {
             method: 'put',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: window.sessionStorage.getItem('token'),
+            },
             body: JSON.stringify({
               id: this.state.user.id,
             }),
@@ -186,20 +228,42 @@ class App extends Component {
 
   onRouteChange = (route) => {
     if (route === 'signout') {
-      this.setState(initialState);
+      return this.setState(initialState);
     } else if (route === 'home') {
       this.setState({ isSignedIn: true });
     }
     this.setState({ route });
   };
 
+  toggleModal = () => {
+    this.setState((prevState) => ({
+      ...prevState,
+      isProfileOpen: !prevState.isProfileOpen,
+    }));
+  };
+
   render() {
     // destructuring, so we don't need to keep typing this.state below
-    const { isSignedIn, imageUrl, route, boxes } = this.state;
+    const { isSignedIn, imageUrl, route, boxes, isProfileOpen, user } =
+      this.state;
     return (
       <div className='App'>
         <Particles id='tsparticles' options={particlesOptions} />
-        <Nav isSignedIn={isSignedIn} onRouteChange={this.onRouteChange} />
+        <Nav
+          isSignedIn={isSignedIn}
+          onRouteChange={this.onRouteChange}
+          toggleModal={this.toggleModal}
+        />
+        {isProfileOpen && (
+          <Modal>
+            <Profile
+              isProfileOpen={isProfileOpen}
+              toggleModal={this.toggleModal}
+              user={user}
+              loadUser={this.loadUser}
+            />
+          </Modal>
+        )}
         {route === 'home' ? (
           <>
             <Logo />

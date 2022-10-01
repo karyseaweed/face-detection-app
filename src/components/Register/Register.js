@@ -23,7 +23,6 @@ class Register extends React.Component {
   };
 
   onSubmitSignIn = () => {
-    console.log(this.state);
     // fetch does a GET request by default, but we want a POST in this case
     fetch('http://localhost:3000/register', {
       method: 'post',
